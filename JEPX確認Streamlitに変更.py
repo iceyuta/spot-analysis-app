@@ -81,20 +81,21 @@ if uploaded_file:
     # 日時整形
     plexos_df["Datetime"] = pd.to_datetime(plexos_df["Datetime"], errors="coerce")
 
-    # 単位変換（¥/MWh → ¥/kWh）＋ 数値化
-    for col in plexos_df.columns:
-        if col in plexos_column_mapping:
+    # ✅ 列名を日本語に変換
+    plexos_df.rename(columns=plexos_column_mapping, inplace=True)
+
+    # ✅ 価格列を数値型に変換して単位換算
+    for col in plexos_column_mapping.values():
+        if col in plexos_df.columns:
             plexos_df[col] = (
                 plexos_df[col].astype(str)
                 .str.replace(",", "", regex=False)
                 .astype(float) / 1000
             )
 
-    # 列名を統一（英語 → 日本語）
-    plexos_df.rename(columns=plexos_column_mapping, inplace=True)
-
-    # 日時をdf_filteredと揃える
+    # ✅ 日時を JEPX 側と整合
     plexos_df["日時"] = df_filtered["日時"].reset_index(drop=True)
+
 
 
 # ---------- グラフタブ ----------
