@@ -54,6 +54,19 @@ else:
     df_filtered = df_filtered.reset_index()
 
 # ---------- PLEXOSデータアップロード ----------
+plexos_column_mapping = {
+    "Chubu": "エリアプライス中部(円/kWh)",
+    "Chugoku": "エリアプライス中国(円/kWh)",
+    "Hokkaido": "エリアプライス北海道(円/kWh)",
+    "Hokuriku": "エリアプライス北陸(円/kWh)",
+    "Kansai": "エリアプライス関西(円/kWh)",
+    "Kyushu": "エリアプライス九州(円/kWh)",
+    "Okinawa": "Okinawa",  # この列名はそのままでOK
+    "Shikoku": "エリアプライス四国(円/kWh)",
+    "TEPCO": "エリアプライス東京(円/kWh)",
+    "Tohoku": "エリアプライス東北(円/kWh)"
+}
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("PLEXOSデータの比較")
 uploaded_file = st.sidebar.file_uploader("PLEXOS出力CSVをアップロード", type="csv")
@@ -65,18 +78,24 @@ if uploaded_file:
     uploaded_file.seek(0)
     plexos_df = pd.read_csv(uploaded_file, encoding=encoding)
 
-    # 日時整形と価格列変換（¥/MWh → ¥/kWh）
+    # 日時整形
     plexos_df["Datetime"] = pd.to_datetime(plexos_df["Datetime"], errors="coerce")
+
+    # 単位変換（¥/MWh → ¥/kWh）＋ 数値化
     for col in plexos_df.columns:
-        if "エリアプライス" in col or col == "Okinawa":
+        if col in plexos_column_mapping:
             plexos_df[col] = (
                 plexos_df[col].astype(str)
                 .str.replace(",", "", regex=False)
                 .astype(float) / 1000
             )
 
-    # PLEXOSにも"日時"列を合わせる（強制整合）
+    # 列名を統一（英語 → 日本語）
+    plexos_df.rename(columns=plexos_column_mapping, inplace=True)
+
+    # 日時をdf_filteredと揃える
     plexos_df["日時"] = df_filtered["日時"].reset_index(drop=True)
+
 
 # ---------- グラフタブ ----------
 tab_labels = ["📈 Spike High", "📉 Spike Low", "📊 トレンド", "💹 売買・約定量"]
