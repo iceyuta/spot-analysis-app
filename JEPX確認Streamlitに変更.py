@@ -79,9 +79,14 @@ if uploaded_file:
     plexos_df["日時"] = df_filtered["日時"].reset_index(drop=True)
 
 # ---------- グラフタブ ----------
-tabs = st.tabs(["📈 Spike High", "📉 Spike Low", "📊 トレンド", "💹 売買・約定量"])
-if plexos_df is not None:
-    tabs += st.tabs(["🔁 PLEXOS vs JEPX", "🔍 差分トレンド"])
+tab_labels = ["📈 Spike High", "📉 Spike Low", "📊 トレンド", "💹 売買・約定量"]
+if uploaded_file:
+    tab_labels += ["🔁 PLEXOS vs JEPX", "🔍 差分トレンド"]
+
+tabs = st.tabs(tab_labels)
+
+# --- 以降は tabs[0]〜tabs[5] の中身を順番に実装すればOK
+
 
 selected_price_cols = [price_columns[area] for area in selected_areas if area in price_columns]
 
