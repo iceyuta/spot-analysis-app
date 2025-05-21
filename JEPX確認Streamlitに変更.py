@@ -46,11 +46,19 @@ selected_areas = st.sidebar.multiselect("表示するエリア", list(price_colu
 # ---------- フィルタと集計 ----------
 df_filtered = df[(df["日時"] >= pd.to_datetime(start_date)) & (df["日時"] <= pd.to_datetime(end_date))]
 
-# 集計単位に応じてリサンプリング
+# 日時をインデックスに設定
+df_filtered = df_filtered.set_index("日時")
+
+# 数値列だけ抽出（平均が取れる列のみ）
+numeric_cols = df_filtered.select_dtypes(include='number').columns
+
+# リサンプリング（日時列はあとで戻す）
 if agg_option == "日別":
-    df_filtered = df_filtered.set_index("日時").resample("D").mean().reset_index()
+    df_filtered = df_filtered[numeric_cols].resample("D").mean().reset_index()
 elif agg_option == "週別":
-    df_filtered = df_filtered.set_index("日時").resample("W-MON").mean().reset_index()
+    df_filtered = df_filtered[numeric_cols].resample("W-MON").mean().reset_index()
+else:
+    df_filtered = df_filtered.reset_index()  # 30分単位はそのまま
 
 # ---------- グラフタブ ----------
 tab1, tab2, tab3, tab4 = st.tabs(["📈 Spike High", "📉 Spike Low", "📊 トレンド", "💹 売買・約定量"])
