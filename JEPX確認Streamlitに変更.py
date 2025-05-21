@@ -151,7 +151,11 @@ if plexos_df is not None:
             col = price_columns.get(area)
             if col and col in plexos_df.columns:
                 diff = plexos_df[col] - df_filtered[col]
-                fig = px.line(x=df_filtered["日時"], y=diff, title=f"{area} の価格差")
+                diff_df = pd.DataFrame({
+                    "日時": df_filtered["日時"],
+                    "価格差": diff
+                })
+                fig = px.line(diff_df, x="日時", y="価格差", title=f"{area} の価格差 (PLEXOS - JEPX)")
                 fig.update_layout(xaxis_title="日時", yaxis_title="価格差 (円/kWh)")
                 st.plotly_chart(fig, use_container_width=True)
 
