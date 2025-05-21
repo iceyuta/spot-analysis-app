@@ -24,12 +24,10 @@ end_date = st.sidebar.date_input("終了日", min_value=min_date, max_value=max_
 
 high_criteria = st.sidebar.slider("Spike High 閾値 (円/kWh)", 0.0, 100.0, 20.0, step=0.5)
 low_criteria = st.sidebar.slider("Spike Low 閾値 (円/kWh)", 0.0, 10.0, 0.5, step=0.1)
-
 agg_option = st.sidebar.selectbox("集計単位", ["30分単位", "日別", "週別"])
 
 # ---------- 対象エリア ----------
 price_columns = {
-    "システム": "システムプライス(円/kWh)",
     "北海道": "エリアプライス北海道(円/kWh)",
     "東北": "エリアプライス東北(円/kWh)",
     "東京": "エリアプライス東京(円/kWh)",
@@ -38,86 +36,127 @@ price_columns = {
     "関西": "エリアプライス関西(円/kWh)",
     "中国": "エリアプライス中国(円/kWh)",
     "四国": "エリアプライス四国(円/kWh)",
-    "九州": "エリアプライス九州(円/kWh)"
+    "九州": "エリアプライス九州(円/kWh)",
+    "システム": "システムプライス(円/kWh)"
 }
-
 selected_areas = st.sidebar.multiselect("表示するエリア", list(price_columns.keys()), default=list(price_columns.keys()))
 
 # ---------- フィルタと集計 ----------
 df_filtered = df[(df["日時"] >= pd.to_datetime(start_date)) & (df["日時"] <= pd.to_datetime(end_date))]
-
-# 日時をインデックスに設定
 df_filtered = df_filtered.set_index("日時")
-
-# 数値列だけ抽出（平均が取れる列のみ）
 numeric_cols = df_filtered.select_dtypes(include='number').columns
 
-# リサンプリング（日時列はあとで戻す）
 if agg_option == "日別":
     df_filtered = df_filtered[numeric_cols].resample("D").mean().reset_index()
 elif agg_option == "週別":
     df_filtered = df_filtered[numeric_cols].resample("W-MON").mean().reset_index()
 else:
-    df_filtered = df_filtered.reset_index()  # 30分単位はそのまま
+    df_filtered = df_filtered.reset_index()
+
+# ---------- PLEXOSデータアップロード ----------
+st.sidebar.markdown("---")
+st.sidebar.subheader("PLEXOSデータの比較")
+uploaded_file = st.sidebar.file_uploader("PLEXOS出力CSVをアップロード", type="csv")
+plexos_df = None
+
+if uploaded_file:
+    raw = uploaded_file.read()
+    encoding = chardet.detect(raw)['encoding']
+    uploaded_file.seek(0)
+    plexos_df = pd.read_csv(uploaded_file, encoding=encoding)
+
+    # 日時整形と価格列変換（¥/MWh → ¥/kWh）
+    plexos_df["Datetime"] = pd.to_datetime(plexos_df["Datetime"], errors="coerce")
+    for col in plexos_df.columns:
+        if "エリアプライス" in col or col == "Okinawa":
+            plexos_df[col] = (
+                plexos_df[col].astype(str)
+                .str.replace(",", "", regex=False)
+                .astype(float) / 1000
+            )
+
+    # PLEXOSにも"日時"列を合わせる（強制整合）
+    plexos_df["日時"] = df_filtered["日時"].reset_index(drop=True)
 
 # ---------- グラフタブ ----------
-tab1, tab2, tab3, tab4 = st.tabs(["📈 Spike High", "📉 Spike Low", "📊 トレンド", "💹 売買・約定量"])
+tabs = st.tabs(["📈 Spike High", "📉 Spike Low", "📊 トレンド", "💹 売買・約定量"])
+if plexos_df is not None:
+    tabs += st.tabs(["🔁 PLEXOS vs JEPX", "🔍 差分トレンド"])
 
-# 対象のカラム
-selected_price_cols = [price_columns[area] for area in selected_areas]
+selected_price_cols = [price_columns[area] for area in selected_areas if area in price_columns]
 
-with tab1:
+# --- Spike High
+with tabs[0]:
     st.header("Spike High")
     for col in selected_price_cols:
         df_high = df_filtered[df_filtered[col] >= high_criteria]
         if not df_high.empty:
-            fig = px.scatter(df_high, x="日時", y=col, title=col, labels={"日時": "日時", col: "価格 (円/kWh)"})
+            fig = px.scatter(df_high, x="日時", y=col, title=col)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info(f"{col} に該当データがありません。")
 
-with tab2:
+# --- Spike Low
+with tabs[1]:
     st.header("Spike Low")
     for col in selected_price_cols:
         df_low = df_filtered[df_filtered[col] <= low_criteria]
         if not df_low.empty:
-            fig = px.scatter(df_low, x="日時", y=col, title=col, labels={"日時": "日時", col: "価格 (円/kWh)"})
+            fig = px.scatter(df_low, x="日時", y=col, title=col)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info(f"{col} に該当データがありません。")
 
-with tab3:
+# --- Trend
+with tabs[2]:
     st.header("年間トレンド")
     fig = go.Figure()
     for col in selected_price_cols:
         fig.add_trace(go.Scatter(x=df_filtered["日時"], y=df_filtered[col], mode='lines', name=col))
-    fig.update_layout(title="エリア別価格のトレンド",
-                      xaxis_title="日時", yaxis_title="価格 (円/kWh)", hovermode="x unified")
+    fig.update_layout(title="エリア別価格のトレンド", xaxis_title="日時", yaxis_title="価格 (円/kWh)")
     st.plotly_chart(fig, use_container_width=True)
 
-with tab4:
+# --- Volume
+with tabs[3]:
     st.header("売り・買い・約定量トレンド")
     fig = go.Figure()
     for name in ["売り入札量(kWh)", "買い入札量(kWh)", "約定総量(kWh)"]:
         if name in df_filtered.columns:
             fig.add_trace(go.Scatter(x=df_filtered["日時"], y=df_filtered[name], mode='lines', name=name))
-    fig.update_layout(title="売買・約定量の推移",
-                      xaxis_title="日時", yaxis_title="電力量 (kWh)", hovermode="x unified")
+    fig.update_layout(title="売買・約定量", xaxis_title="日時", yaxis_title="電力量 (kWh)")
     st.plotly_chart(fig, use_container_width=True)
 
-# ---------- データエクスポート ----------
+# --- PLEXOS vs JEPX
+if plexos_df is not None:
+    with tabs[4]:
+        st.header("PLEXOS vs JEPX 各地域トレンド比較")
+        for area in selected_areas:
+            col = price_columns.get(area)
+            if col and col in plexos_df.columns:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=df_filtered["日時"], y=df_filtered[col], name=f"JEPX - {area}"))
+                fig.add_trace(go.Scatter(x=plexos_df["日時"], y=plexos_df[col], name=f"PLEXOS - {area}"))
+                fig.update_layout(title=f"{area} の価格比較", xaxis_title="日時", yaxis_title="価格 (円/kWh)")
+                st.plotly_chart(fig, use_container_width=True)
+
+# --- 差分
+    with tabs[5]:
+        st.header("PLEXOS - JEPX 差分トレンド")
+        for area in selected_areas:
+            col = price_columns.get(area)
+            if col and col in plexos_df.columns:
+                diff = plexos_df[col] - df_filtered[col]
+                fig = px.line(x=df_filtered["日時"], y=diff, title=f"{area} の価格差")
+                fig.update_layout(xaxis_title="日時", yaxis_title="価格差 (円/kWh)")
+                st.plotly_chart(fig, use_container_width=True)
+
+# ---------- エクスポート ----------
 st.sidebar.markdown("---")
 st.sidebar.subheader("データのエクスポート")
 
 @st.cache_data
 def convert_df_to_csv(df):
-    return df.to_csv(index=False).encode('utf-8-sig')  # 日本語対応のUTF-8（BOM付き）
+    return df.to_csv(index=False).encode('utf-8-sig')
 
 csv = convert_df_to_csv(df_filtered)
-
-st.sidebar.download_button(
-    label="📥 フィルタ済みデータをCSVでダウンロード",
-    data=csv,
-    file_name="filtered_data.csv",
-    mime='text/csv'
-)
+st.sidebar.download_button("📥 フィルタ済みデータをCSVでダウンロード", data=csv, file_name="filtered_data.csv", mime='text/csv')
