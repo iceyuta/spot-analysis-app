@@ -4,10 +4,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 import chardet
 
-# ---------- クエリと表示言語切り替え ----------
+# クエリから言語設定読み取り
 query_params = st.experimental_get_query_params()
 language_en = query_params.get("lang", ["ja"])[0] == "en"
-language_en = st.sidebar.toggle("🌐 Display in English", value=language_en)
+
+# 🌐 トグルを最上部に明示的に置く
+st.sidebar.markdown("## 🌐 Language")
+language_en = st.sidebar.toggle("Display in English", value=language_en)
+
+# 言語切り替え関数
+def trans(ja: str, en: str) -> str:
+    return en if language_en else ja
 
 def trans(ja: str, en: str) -> str:
     return en if language_en else ja
