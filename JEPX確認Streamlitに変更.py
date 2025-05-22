@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 import chardet
 
 # クエリから言語設定読み取り
-query_params = st.experimental_get_query_params()
 lang_param = st.query_params.get("lang") or "ja"
 language_en = lang_param == "en"
 
