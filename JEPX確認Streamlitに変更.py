@@ -6,7 +6,9 @@ import chardet
 
 # クエリから言語設定読み取り
 query_params = st.experimental_get_query_params()
-language_en = query_params.get("lang", ["ja"])[0] == "en"
+lang_param = st.query_params.get("lang") or "ja"
+language_en = lang_param == "en"
+
 
 # 🌐 トグルを最上部に明示的に置く
 st.sidebar.markdown("## 🌐 Language")
