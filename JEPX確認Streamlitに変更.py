@@ -187,11 +187,11 @@ if uploaded_file:
                 st.plotly_chart(fig, use_container_width=True)
 
     with tabs[5]:
-        st.header(trans("PLEXOS - JEPX 差分トレンド", "PLEXOS - JEPX Price Difference"))
+        st.header(trans("JEPX - PLEXOS 差分トレンド", "JEPX - PLEXOS Price Difference"))
         for area in selected_areas:
             col = price_columns.get(area)
             if col and col in plexos_df.columns:
-                diff = plexos_df[col] - df_filtered[col]
+                diff = df_filtered[col] - plexos_df[col]
                 diff_df = pd.DataFrame({"日時": df_filtered["日時"], "価格差": diff})
                 fig = px.line(diff_df, x="日時", y="価格差", title=f"{area} {trans('の価格差', 'Price Diff')}")
                 fig.update_layout(xaxis_title=trans("日時", "Datetime"), yaxis_title=trans("価格差 (円/kWh)", "Diff (¥/kWh)"))
