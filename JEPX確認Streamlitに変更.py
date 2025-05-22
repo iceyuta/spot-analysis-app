@@ -8,15 +8,11 @@ import chardet
 lang_param = st.query_params.get("lang") or "ja"
 language_en = lang_param == "en"
 
-
 # 🌐 トグルを最上部に明示的に置く
 st.sidebar.markdown("## 🌐 Language")
 language_en = st.sidebar.toggle("Display in English", value=language_en)
 
 # 言語切り替え関数
-def trans(ja: str, en: str) -> str:
-    return en if language_en else ja
-
 def trans(ja: str, en: str) -> str:
     return en if language_en else ja
 
@@ -72,7 +68,6 @@ selected_areas = st.sidebar.multiselect(trans("表示するエリア", "Select A
 df_filtered = df[(df["日時"] >= pd.to_datetime(start_date)) & (df["日時"] <= pd.to_datetime(end_date))]
 df_filtered = df_filtered.set_index("日時")
 numeric_cols = df_filtered.select_dtypes(include='number').columns
-
 if agg_option in ["日別", "Daily"]:
     df_filtered = df_filtered[numeric_cols].resample("D").mean().reset_index()
 elif agg_option in ["週別", "Weekly"]:
@@ -115,53 +110,46 @@ if uploaded_file:
             )
     plexos_df["日時"] = df_filtered["日時"].reset_index(drop=True)
 
-# ---------- タブ ----------
+# ---------- タブ（常に7つ定義） ----------
 tab_labels = [
     trans("📈 Spike High", "📈 Spike High"),
     trans("📉 Spike Low", "📉 Spike Low"),
     trans("📊 トレンド", "📊 Trend"),
-    trans("💹 売買・約定量", "💹 Bid/Contract Volume")
+    trans("💹 売買・約定量", "💹 Bid/Contract Volume"),
+    trans("🔁 PLEXOSとJEPXの比較", "🔁 PLEXOS vs JEPX"),
+    trans("🔍 地域別価格差", "🔍 Price Difference"),
+    trans("📊 統計量", "📊 Statistics")
 ]
-if uploaded_file:
-    tab_labels += [trans("🔁 PLEXOSとJEPXの比較", "🔁 PLEXOS vs JEPX"),
-                   trans("🔍 地域別価格差", "🔍 Price Difference"),
-                   trans("📊 統計量", "📊 Statistics")]
 tabs = st.tabs(tab_labels)
 
-# --- 各グラフ ---
-selected_price_cols = [price_columns[area] for area in selected_areas if area in price_columns]
-
-# Spike High
+# --- Spike High
 with tabs[0]:
     st.header("Spike High")
-    for col in selected_price_cols:
+    for col in [price_columns[a] for a in selected_areas if a in price_columns]:
         df_high = df_filtered[df_filtered[col] >= high_criteria]
         if not df_high.empty:
             fig = px.scatter(df_high, x="日時", y=col, title=col)
             st.plotly_chart(fig, use_container_width=True)
 
-# Spike Low
+# --- Spike Low
 with tabs[1]:
     st.header("Spike Low")
-    for col in selected_price_cols:
+    for col in [price_columns[a] for a in selected_areas if a in price_columns]:
         df_low = df_filtered[df_filtered[col] <= low_criteria]
         if not df_low.empty:
             fig = px.scatter(df_low, x="日時", y=col, title=col)
             st.plotly_chart(fig, use_container_width=True)
 
-# Trend
+# --- Trend
 with tabs[2]:
     st.header(trans("トレンド", "Trend"))
     fig = go.Figure()
-    for col in selected_price_cols:
-        fig.add_trace(go.Scatter(x=df_filtered["日時"], y=df_filtered[col], mode='lines', name=col,
-                                 hovertemplate=f"%{{x}}<br>%{{y}} {trans('円/kWh','¥/kWh')}"))
-    fig.update_layout(title=trans("エリア別価格トレンド", "Area Price Trend"),
-                      xaxis_title=trans("日時", "Datetime"),
-                      yaxis_title=trans("価格 (円/kWh)", "Price (¥/kWh)"))
+    for col in [price_columns[a] for a in selected_areas if a in price_columns]:
+        fig.add_trace(go.Scatter(x=df_filtered["日時"], y=df_filtered[col], mode='lines', name=col))
+    fig.update_layout(xaxis_title=trans("日時", "Datetime"), yaxis_title=trans("価格 (円/kWh)", "Price (¥/kWh)"))
     st.plotly_chart(fig, use_container_width=True)
 
-# Volume
+# --- Volume
 with tabs[3]:
     st.header(trans("売買・約定量トレンド", "Bid/Contract Volume"))
     fig = go.Figure()
@@ -171,10 +159,10 @@ with tabs[3]:
     fig.update_layout(xaxis_title=trans("日時", "Datetime"), yaxis_title=trans("電力量 (kWh)", "Energy (kWh)"))
     st.plotly_chart(fig, use_container_width=True)
 
-# PLEXOS vs JEPX
-if uploaded_file:
-    with tabs[4]:
-        st.header("PLEXOS vs JEPX")
+# --- PLEXOS vs JEPX
+with tabs[4]:
+    st.header("PLEXOS vs JEPX")
+    if uploaded_file:
         for area in selected_areas:
             col = price_columns.get(area)
             if col and col in plexos_df.columns:
@@ -184,8 +172,10 @@ if uploaded_file:
                 fig.update_layout(title=f"{area} {trans('の価格比較', 'Price Comparison')}")
                 st.plotly_chart(fig, use_container_width=True)
 
-    with tabs[5]:
-        st.header(trans("JEPX - PLEXOS 差分トレンド", "JEPX - PLEXOS Price Difference"))
+# --- 差分
+with tabs[5]:
+    st.header(trans("JEPX - PLEXOS 差分トレンド", "JEPX - PLEXOS Price Difference"))
+    if uploaded_file:
         for area in selected_areas:
             col = price_columns.get(area)
             if col and col in plexos_df.columns:
@@ -194,25 +184,27 @@ if uploaded_file:
                 fig = px.line(diff_df, x="日時", y="価格差", title=f"{area} {trans('の価格差', 'Price Diff')}")
                 fig.update_layout(xaxis_title=trans("日時", "Datetime"), yaxis_title=trans("価格差 (円/kWh)", "Diff (¥/kWh)"))
                 st.plotly_chart(fig, use_container_width=True)
-    with tabs[6]:
-        st.header(trans("価格差の統計量とヒストグラム", "Price Difference Statistics & Histogram"))
+
+# --- 統計量
+with tabs[6]:
+    st.header(trans("価格差の統計量とヒストグラム", "Price Difference Statistics & Histogram"))
+    if not uploaded_file:
+        st.info(trans("PLEXOSファイルをアップロードしてください", "Please upload a PLEXOS file"))
+    else:
         for area in selected_areas:
             col = price_columns.get(area)
             if col and col in plexos_df.columns:
-                diff = df_filtered[col] - plexos_df[col]  # JEPX - PLEXOS
+                diff = df_filtered[col] - plexos_df[col]
                 stats = {
                     trans("最大値", "Max"): diff.max(),
                     trans("最小値", "Min"): diff.min(),
                     trans("平均値", "Mean"): diff.mean(),
                     trans("標準偏差", "Std"): diff.std()
                 }
-                stat_df = pd.DataFrame.from_dict(stats, orient="index", columns=[f"{area}"])
                 st.subheader(f"{area}")
-                st.dataframe(stat_df)
-
-                # ヒストグラム
-                fig = px.histogram(diff, nbins=30, title=f"{area} {trans('の価格差ヒストグラム', 'Price Difference Histogram')}")
-                fig.update_layout(xaxis_title=trans("価格差 (円/kWh)", "Price Diff (¥/kWh)"),
+                st.dataframe(pd.DataFrame.from_dict(stats, orient="index", columns=["価格差"]))
+                fig = px.histogram(diff, nbins=30, title=f"{area} {trans('の価格差ヒストグラム', 'Price Diff Histogram')}")
+                fig.update_layout(xaxis_title=trans("価格差 (円/kWh)", "Diff (¥/kWh)"),
                                   yaxis_title=trans("頻度", "Frequency"))
                 st.plotly_chart(fig, use_container_width=True)
 
