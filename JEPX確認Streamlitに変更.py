@@ -16,6 +16,11 @@ language_en = st.sidebar.toggle("Display in English", value=language_en)
 def trans(ja: str, en: str) -> str:
     return en if language_en else ja
 
+
+with open("external_links_sidebar.md", "r", encoding="utf-8") as f:
+    st.sidebar.markdown(f.read(), unsafe_allow_html=True)
+
+
 # ---------- データ読み込み ----------
 file_path = "SpotSummary2023Origin.csv"
 with open(file_path, 'rb') as f:
