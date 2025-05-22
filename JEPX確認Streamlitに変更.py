@@ -128,8 +128,6 @@ if uploaded_file:
                    trans("📊 統計量", "📊 Statistics")]
 tabs = st.tabs(tab_labels)
 
-selected_price_cols = [price_columns[area] for area in selected_areas if area in price_columns]
-
 # --- 各グラフ ---
 selected_price_cols = [price_columns[area] for area in selected_areas if area in price_columns]
 
