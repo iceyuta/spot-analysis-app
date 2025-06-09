@@ -12,6 +12,10 @@ language_en = lang_param == "en"
 st.sidebar.markdown("## 🌐 Language")
 language_en = st.sidebar.toggle("Display in English", value=language_en)
 
+# --- データ年度選択のトグルボタンを追加 ---
+st.sidebar.markdown("## 📅 Data Year Selection")
+
+
 # 言語切り替え関数
 def trans(ja: str, en: str) -> str:
     return en if language_en else ja
@@ -19,16 +23,14 @@ def trans(ja: str, en: str) -> str:
 with open("external_links_sidebar.md", "r", encoding="utf-8") as f:
     st.sidebar.markdown(f.read(), unsafe_allow_html=True)
 
-# --- データ年度選択のトグルボタンを追加 ---
-st.sidebar.markdown("## 📅 Data Year Selection")
-# デフォルトで2023年を選択
-use_2024_data = st.sidebar.toggle(trans("FY2024データを表示", "Display FY2024 Data"), value=False, help=trans("オンにすると2024年のデータが使用されます", "Toggle to use 2024 data"))
+# デフォルトで2024年を選択
+use_2023_data = st.sidebar.toggle(trans("FY2023データを表示", "Display FY2023 Data"), value=False, help=trans("オンにすると2023年のデータが使用されます", "Toggle to use 2023 data"))
 
 # ---------- データ読み込み ----------
-if use_2024_data:
-    file_path = "SpotSummary2024Origin.csv"
-else:
+if use_2023_data:
     file_path = "SpotSummary2023Origin.csv"
+else:
+    file_path = "SpotSummary2024Origin.csv"
 
 try:
     with open(file_path, 'rb') as f:
