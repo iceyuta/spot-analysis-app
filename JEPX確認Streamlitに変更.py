@@ -16,17 +16,28 @@ language_en = st.sidebar.toggle("Display in English", value=language_en)
 def trans(ja: str, en: str) -> str:
     return en if language_en else ja
 
-
 with open("external_links_sidebar.md", "r", encoding="utf-8") as f:
     st.sidebar.markdown(f.read(), unsafe_allow_html=True)
 
+# --- データ年度選択のトグルボタンを追加 ---
+st.sidebar.markdown("## 📅 Data Year Selection")
+# デフォルトで2023年を選択
+use_2024_data = st.sidebar.toggle(trans("FY2024データを表示", "Display FY2024 Data"), value=False, help=trans("オンにすると2024年のデータが使用されます", "Toggle to use 2024 data"))
 
 # ---------- データ読み込み ----------
-file_path = "SpotSummary2023Origin.csv"
-with open(file_path, 'rb') as f:
-    rawdata = f.read(10000)
-    encoding = chardet.detect(rawdata)['encoding']
-df = pd.read_csv(file_path, encoding=encoding)
+if use_2024_data:
+    file_path = "SpotSummary2024Origin.csv"
+else:
+    file_path = "SpotSummary2023Origin.csv"
+
+try:
+    with open(file_path, 'rb') as f:
+        rawdata = f.read(10000)
+        encoding = chardet.detect(rawdata)['encoding']
+    df = pd.read_csv(file_path, encoding=encoding)
+except FileNotFoundError:
+    st.error(trans(f"{file_path} が見つかりません。ファイルが存在するか確認してください。", f"{file_path} not found. Please ensure the file exists."))
+    st.stop() # ファイルが見つからない場合はアプリの実行を停止
 
 df["日時"] = pd.to_datetime(df["受渡日"]) + pd.to_timedelta((df["時刻コード"] - 1) * 30, unit='m')
 
@@ -224,6 +235,6 @@ def convert_df_to_csv(df):
 
 csv = convert_df_to_csv(df_filtered)
 st.sidebar.download_button(label=trans("📥 フィルタ済みデータをCSVでダウンロード", "📥 Download Filtered CSV"),
-                           data=csv,
-                           file_name="filtered_data.csv",
-                           mime='text/csv')
+                            data=csv,
+                            file_name="filtered_data.csv",
+                            mime='text/csv')
